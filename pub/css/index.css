@@ -1,0 +1,120 @@
+
+.info, .profile-icon {
+  float: left;
+  padding: 3px;
+  max-width: 150px
+}
+
+.profile-icon {
+  border-radius: 4px;
+  border: 1px solid #eee;
+  background-color: white;
+}
+
+.name {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.flag {
+  width: 50px;
+}
+
+.needed, .perc-funded {
+  color: green;
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.with-help {
+  color: #0E90D2;
+  font-size: 20px;
+}
+
+.pledge {
+  max-width: 100px;
+  font-size: 30px;
+}
+
+.noPledge {
+  display: none;
+}
+
+.pledges td.main-info {
+  border-left: 4px solid #74b446;
+}
+
+.funded, .use{
+  font-style: italic;
+  color: #666;
+  margin: 4px;
+}
+
+.with-help-suffix {
+  display: none;
+  color: #74b446;
+}
+
+.location {
+  float: right;
+}
+
+.pledge-area {
+  max-width: 120px;
+}
+
+table {
+  background-color: white;
+}
+
+thead {
+  background-color: #74b446;
+  color: white;
+  font-size: 20px;
+  display: none;
+}
+
+body {
+  padding-top: 70px;
+  background-color: #F7F7F2;
+}
+
+.messageArea {
+  float: right;
+  margin-top: 10px;
+}
+
+.hl {
+  background-color: yellow;
+}
+
+
+.navbar-inner {
+  background: white;
+  border-bottom: 1px solid #74b446;
+}
+
+
+.navbar h2 {
+  float: left;
+  margin-top: 10px;
+}
+
+.brand img {
+  max-height: 40px;
+}
+
+.pledges-header {
+  float: right;
+  color: #74b446;
+  cursor: pointer;
+}
+
+.pledges-header h2 {
+  padding: 4px;
+}
+
+input.search {
+  background-color: white;
+  margin-top: 15px;
+}
