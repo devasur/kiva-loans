@@ -7,6 +7,7 @@ path = require 'path'
 app = express.createServer()
 app.configure ->
   app.use express.static "#{__dirname}/../pub"
+  app.use express.bodyParser()
   app.set 'views', "#{__dirname}/../pub/views"
   app.set 'view options', { layout: false }
   app.set 'view engine', 'coffee'
@@ -15,6 +16,38 @@ app.configure ->
 
 app.get '/', (req,res)->
   res.render 'index'
+
+
+# passes along ajax-post data to requestb.in
+# (to avoid access-origin)
+app.post '/reqBin/:id', (req,res)->
+  
+  postData = JSON.stringify req.body
+  
+  options =
+    host: 'requestb.in'
+    path: "/#{req.params.id}"
+    method: 'POST'
+    port: 80
+    headers:
+      'Content-length': postData.length
+  
+  
+  postBin = http.request options, (resp)->
+    resp.setEncoding 'utf8'
+    console.log 'status: ',resp.statusCode
+    resp.on 'data', (data)->
+      console.log 'resp: ',data
+      res.json data
+  
+  postBin.on 'error', (err)->
+    res.json err
+  
+  postBin.end postData
+
+# check to see if we have the flag
+# if not, try to get the image from the geognos api
+# and download it locally
 
 app.get '/flag/:countryCode', (req,res)->
   # where the image should be if already downloaded

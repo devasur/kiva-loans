@@ -34,7 +34,7 @@
     Loan.prototype.initialize = function() {
       var _this = this;
       return this.on('change:pledge', function() {
-        return _this.collection.trigger('update:pledgeTotal', _this.collection.pledgeTotal());
+        return _this.collection.trigger('update:pledgeTotal', _this.collection.pledgeCount(), _this.collection.pledgeTotal());
       });
     };
 
@@ -68,7 +68,7 @@
     Loan.prototype.matches = function(term) {
       var fieldsToSearch, re;
       re = RegExp(term, 'gi');
-      fieldsToSearch = this.get('name') + this.get('activity') + this.get('use') + this.get('country');
+      fieldsToSearch = this.get('name') + this.get('activity') + this.get('use') + this.get('location').country;
       return re.test(fieldsToSearch);
     };
 
@@ -93,6 +93,7 @@
         _this = this;
       this.latestLoad = moment().valueOf();
       this.page = 1;
+      this.searchTypeAheadTerms = [];
       return checkForNewLoans = doEvery(10000, function() {
         return _this.fetch({
           add: true
@@ -101,7 +102,6 @@
     };
 
     Loans.prototype.comparator = function(loan) {
-      console.log('sorting');
       return 1 / parseInt(loan.get('postedMoment'), 10);
     };
 
@@ -109,6 +109,10 @@
       return _.reduce(this.models, function(runningTotal, loan) {
         return runningTotal + loan.getPledge();
       }, 0);
+    };
+
+    Loans.prototype.pledgeCount = function() {
+      return this.pledgedLoans().length;
     };
 
     Loans.prototype.pledgedLoans = function() {
@@ -159,24 +163,61 @@
     };
 
     Loans.prototype.parse = function(resp) {
-      var l, loans, _i, _len,
+      var keywords, l, loans, _i, _len,
         _this = this;
       this.page++;
-      console.log('incoming: ', resp.loans);
+      console.log('loading more...');
       loans = _.reject(resp.loans, function(l) {
         var _ref;
         return _ref = l.id, __indexOf.call(_.pluck(_this.models, 'id'), _ref) >= 0;
       });
+      keywords = [];
       for (_i = 0, _len = loans.length; _i < _len; _i++) {
         l = loans[_i];
         l.pledge = 0;
         l.postedMoment = moment(l.posted_date).valueOf();
+        keywords.push(l.sector, l.activity, l.name, l.location.country);
         if (l.postedMoment >= this.latestLoad) {
           l.isRecent = true;
         }
       }
-      console.log('filtered/parsed: ', loans);
+      this.searchTypeAheadTerms = _.union(_.compact(keywords), this.searchTypeAheadTerms);
+      this.trigger('search:typeahead', this.searchTypeAheadTerms);
       return loans;
+    };
+
+    Loans.prototype.submit = function(cb) {
+      var myPledges, p;
+      myPledges = (function() {
+        var _i, _len, _ref, _results;
+        _ref = this.pledgedLoans();
+        _results = [];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          p = _ref[_i];
+          _results.push({
+            loanId: p.get('id'),
+            amount: p.get('pledge')
+          });
+        }
+        return _results;
+      }).call(this);
+      return $.post('/reqBin/1kggro81', {
+        pledges: myPledges
+      }, function(resp) {
+        return cb(resp);
+      });
+    };
+
+    Loans.prototype.clearPledges = function() {
+      var l, _i, _len, _ref, _results;
+      _ref = this.models;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        l = _ref[_i];
+        l.set('pledge', 0);
+        _results.push(l.collection.trigger('pledge:save', l));
+      }
+      return _results;
     };
 
     return Loans;
@@ -191,7 +232,7 @@
       return LoansList.__super__.constructor.apply(this, arguments);
     }
 
-    LoansList.prototype.className = 'loansList';
+    LoansList.prototype.className = 'container loansList';
 
     LoansList.prototype.tagName = 'div';
 
@@ -202,7 +243,6 @@
         return _this.render();
       });
       this.collection.on('add', function(m) {
-        console.log('added: ', m);
         if (m.get('isRecent')) {
           return _this.updateRecentCount();
         } else {
@@ -228,12 +268,12 @@
           "class": 'pledges'
         }, function() {
           return tr(function() {
-            return td({
+            return th({
               colspan: 4
             }, function() {
-              return div({
+              return h4({
                 id: 'pl'
-              });
+              }, 'Pledge a loan to these partners by entering amounts to the right of their requests.');
             });
           });
         });
@@ -256,12 +296,13 @@
     LoansList.prototype.updateRecentCount = function() {
       var newCount,
         _this = this;
-      console.log(newCount = this.collection.recentCount());
+      newCount = this.collection.recentCount();
       this.$('.recentCount').text("" + newCount + " new loans were posted. Click here to view them.");
-      return this.$('.recentCount').fadeIn().click(function() {
+      this.$('.recentCount').fadeIn().click(function() {
         _this.$('.recentCount').fadeOut();
         return _this.addNewLoans();
       });
+      return $('.new-loans').show();
     };
 
     LoansList.prototype.addNewLoans = function() {
@@ -278,7 +319,6 @@
     LoansList.prototype.render = function() {
       var loan, _i, _len, _ref,
         _this = this;
-      console.log('this obj', this);
       this.$el.html(ck.render(this.template));
       _ref = this.collection.models;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
@@ -286,8 +326,12 @@
         this.addLoanView(loan);
       }
       this.$('.pledges').waypoint(function(ev, direction) {
-        console.log('wp', direction);
         return _this.trigger('pledge:scrollPast', direction);
+      });
+      this.$('.recentCount').waypoint(function(ev, direction) {
+        if (_this.$('.recentCount').is(':visible')) {
+          return _this.trigger('newLoans:scrollPast', direction);
+        }
       });
       this.addScrollTrigger();
       return this;
@@ -323,21 +367,21 @@
 
     LoansList.prototype.addScrollTrigger = function() {
       var _this = this;
-      this.$('tfoot.progress-container').html(ck.render(this.scrollTriggerTemplate));
-      return this.$('tfoot.progress-container').click(function() {
-        return _this.loadMore();
-      });
+      this.$('.progress-container').html(ck.render(this.scrollTriggerTemplate));
       /*
-          wait 1000, =>
-            @$('#more').waypoint('destroy')
-            $.waypoints('refresh')
-            
-            # lazy load older loans on scroll to bottom of page
-            @$('#more').waypoint => 
-              @loadMore()
-            , { 'offset': '100%' }
+          @$('.progress-container').click =>
+            @loadMore()
       */
 
+      return wait(1000, function() {
+        _this.$('#more').waypoint('destroy');
+        $.waypoints('refresh');
+        return _this.$('#more').waypoint(function() {
+          return _this.loadMore();
+        }, {
+          'offset': '100%'
+        });
+      });
     };
 
     LoansList.prototype.renderPledges = function() {
@@ -390,7 +434,6 @@
       }
       v.delegateEvents();
       return loan.view.on('all', function(event, data) {
-        console.log('bubbling', event, data);
         return _this.trigger(event, data);
       });
     };
@@ -414,12 +457,10 @@
     LoanView.prototype.initialize = function() {
       var _this = this;
       this.model.on('error', function(error) {
-        console.log('model error');
         _this.$('.pledge-control').removeClass('success').addClass('error');
         return _this.$('.with-help-suffix').hide();
       });
       return this.model.on('change', function(m) {
-        console.log('model changed');
         return _this.updateProgress();
       });
     };
@@ -429,33 +470,42 @@
         "class": 'main-info'
       }, function() {
         div({
-          "class": 'location'
+          "class": 'info-cont'
         }, function() {
-          div("" + (this.loan.get('location').country));
-          return img({
-            "class": 'flag',
-            src: "" + (this.loan.flagImage())
+          div({
+            "class": 'location'
+          }, function() {
+            img({
+              "class": 'flag',
+              src: "" + (this.loan.flagImage())
+            });
+            return div("" + (this.loan.get('location').country));
           });
-        });
-        div({
-          "class": 'profile-icon'
-        }, function() {
-          return img({
-            src: "" + (this.loan.profileImage())
+          div({
+            "class": 'profile-icon'
+          }, function() {
+            return img({
+              src: "" + (this.loan.profileImage())
+            });
+          });
+          return div({
+            "class": 'info'
+          }, function() {
+            div({
+              "class": 'name'
+            }, "" + (this.loan.get('name')));
+            div({
+              "class": 'activity'
+            }, "" + (this.loan.get('activity')));
+            return div({
+              "class": 'use'
+            }, "" + (this.loan.get('use')));
           });
         });
         return div({
-          "class": 'info'
+          "class": 'time-posted'
         }, function() {
-          div({
-            "class": 'name'
-          }, "" + (this.loan.get('name')));
-          div({
-            "class": 'activity'
-          }, "" + (this.loan.get('activity')));
-          return div({
-            "class": 'use'
-          }, "" + (this.loan.get('use')));
+          return em("posted " + (moment(this.loan.get('postedMoment')).fromNow()));
         });
       });
       td({
@@ -536,10 +586,7 @@
     };
 
     LoanView.prototype.update = function(e) {
-      var prevVal;
-      prevVal = this.model.getPledge();
-      this.model.set('pledge', this.$('input.pledge').val() || 0);
-      return this.model.lastChangeIsPositive = this.model.getPledge() > prevVal;
+      return this.model.set('pledge', this.$('input.pledge').val() || 0);
     };
 
     LoanView.prototype.saveChange = function(e) {
@@ -549,13 +596,6 @@
       } else {
         if (!this.model.getPledge()) {
           this.$('.pledge').val('');
-        }
-        if (this.model.lastChangeIsPositive) {
-          this.trigger('message', {
-            message: '<strong>Thank you!</strong>',
-            timeout: 2000,
-            type: 'success'
-          });
         }
         return this.model.collection.trigger('pledge:save', this.model);
       }
@@ -583,10 +623,18 @@
 
     TopBar.prototype.el = '.navbar-fixed-top';
 
+    TopBar.prototype.initialize = function() {};
+
     TopBar.prototype.events = {
       'keyup .search': 'searchKeyPress',
-      'click .pledges-header': function() {
+      'click .pledge-link': function() {
         return $('body').scrollTop(-50);
+      },
+      'click .new-loans': function() {
+        return $('body').scrollTop($('.recentCount').scrollTop() - 50);
+      },
+      'click .submit-pledges': function() {
+        return this.trigger('submit');
       }
     };
 
@@ -606,8 +654,13 @@
       }
     };
 
-    TopBar.prototype.updatePledgeTotal = function(newAmount) {
-      this.$('.pledge-total').text(newAmount);
+    TopBar.prototype.updatePledgeTotal = function(newCount, newAmount) {
+      if (newCount === 0) {
+        this.$('.pledges-header').slideUp();
+      } else {
+        this.$('.pledges-header').slideDown();
+      }
+      this.$('.submit-pledges h3').text("Submit " + newCount + " pledge" + (newCount > 1 ? 's' : '') + " totalling $ " + newAmount);
       return this;
     };
 
@@ -616,6 +669,14 @@
         return this.$('.pledge-link').hide();
       } else {
         return this.$('.pledge-link').show();
+      }
+    };
+
+    TopBar.prototype.toggleNewLoansLink = function(direction) {
+      if (direction === 'up') {
+        return this.$('.new-loans').hide();
+      } else {
+        return this.$('.new-loans').show();
       }
     };
 
@@ -649,6 +710,16 @@
       }
     };
 
+    TopBar.prototype.showThanks = function(cb) {
+      return $('#thanks').modal('show').on('shown', cb);
+    };
+
+    TopBar.prototype.loadTypeAhead = function(keywords) {
+      return $('input.search').typeahead({
+        source: keywords
+      });
+    };
+
     return TopBar;
 
   })(Backbone.View);
@@ -669,14 +740,27 @@
         collection: this.loans
       });
       this.loans.fetch();
-      this.loans.on('update:pledgeTotal', function(newVal) {
-        return _this.topBar.updatePledgeTotal(newVal);
+      this.loans.on('update:pledgeTotal', function(newCount, newVal) {
+        return _this.topBar.updatePledgeTotal(newCount, newVal);
+      });
+      this.loans.on('search:typeahead', function(newKeywords) {
+        return _this.topBar.loadTypeAhead(newKeywords);
       });
       this.loansList.on('pledge:scrollPast', function(direction) {
         return _this.topBar.togglePledgeLink(direction);
       });
-      return this.topBar.on('search', function(term) {
+      this.loansList.on('newLoans:scrollPast', function(direction) {
+        return _this.topBar.toggleNewLoansLink(direction);
+      });
+      this.topBar.on('search', function(term) {
         return _this.loansList.doSearch(term);
+      });
+      return this.topBar.on('submit', function() {
+        return _this.loans.submit(function(resp) {
+          return _this.topBar.showThanks(function() {
+            return _this.loans.clearPledges();
+          });
+        });
       });
     };
 
