@@ -60,9 +60,33 @@ class Loans extends Backbone.Collection
     # fetch newest loans every 10 seconds
     checkForNewLoans = doEvery 10000, => @fetch({add:true})
 
+    @on 'pledge:save', =>
+      window.localStorage.setItem 'kivaPledges', JSON.stringify @pledgesToSave()
+
+
+
+  # get pledges from localStorage
+  restorePledges: (cb)->
+    prevPledges = JSON.parse localStorage?.getItem('kivaPledges') ? []
+    #console.log(prevPledges)
+    if prevPledges.length
+      oldUrl = @url
+      @url = "http://api.kivaws.org/v1/loans/#{ _.keys(prevPledges).join(',') }.json"
+      console.log @url
+      @fetch {
+        add:true
+        success: =>
+          for loan in @models
+            loan.set 'pledge', prevPledges[loan.id]
+          @url = oldUrl
+          cb()
+      }
+    else cb()
+
+
   # keep these sorted by the posted_date
   comparator: (loan)->
-    1/parseInt(loan.get('postedMoment'),10)
+    1 - loan.getPledge()
 
   # total of current pledges
   pledgeTotal: ->
@@ -77,6 +101,12 @@ class Loans extends Backbone.Collection
     filtered = _.filter @models, (loan)-> loan.getPledge() > 0
     sorted = _.sortBy filtered, (loan)-> 100000000 - loan.getPledge()
 
+
+  pledgesToSave:->
+    pledges = {}
+    pledges[p.id] = p.getPledge() for p in @pledgedLoans()
+    pledges
+
   loansWithNoPledge: ->
     filtered = _.filter @models, (loan)-> not loan.getPledge()
 
@@ -90,19 +120,21 @@ class Loans extends Backbone.Collection
   recentCount: ->
     (@where {isRecent: true}).length
 
-  filteredCollection: (term)->
+  filteredCollection: (@term)->
     loansToSearch = @loansWithNoPledge()
-    if term
+    if @term
       _.filter loansToSearch, (m)->
-        m.matches(term)
+        m.matches(@term)
     else loansToSearch
 
   # pull out the loan array in the JSON as it arrives
   parse: (resp)->
+    console.log @url, resp
     @page++
     # remove any loans that have already been loaded
     console.log 'loading more...'
     loans = _.reject resp.loans, (l)=> l.id in _.pluck(@models,'id')
+
     keywords = []
     
     for l in loans 
@@ -110,18 +142,21 @@ class Loans extends Backbone.Collection
       l.postedMoment = moment(l.posted_date).valueOf()
       
       # gather keyword for the search typeahead along the way
-      keywords.push l.sector, l.activity, l.name, l.location.country
+      keywords.push l.sector, l.activity
       
       # mark the loan as recent if the posted_date is later
       # than the latest load time
       if l.postedMoment >= @latestLoad then l.isRecent = true
     
     @searchTypeAheadTerms = _.union(_.compact(keywords),@searchTypeAheadTerms)
-    @trigger 'search:typeahead',@searchTypeAheadTerms 
+    
+    @trigger 'search:addToTypeAhead',@searchTypeAheadTerms 
+
     loans
   
   submit: (cb)->
     myPledges = ({loanId: p.get('id'), amount: p.get('pledge')} for p in @pledgedLoans())
+    #console.log myPledges
     $.post '/reqBin/1kggro81', {pledges: myPledges}, (resp)->
       cb(resp)
 
@@ -129,12 +164,29 @@ class Loans extends Backbone.Collection
     for l in @models
       l.set('pledge',0)
       l.collection.trigger 'pledge:save', l
+
+  getBorrowerInfo: ->
+    wait 250, =>
+      loansToDo = (@filter (l)-> not l.get('borrowerInfo')?)
+      #console.log loansToDo
+      if loansToDo.length
+        firstTenIds = _.pluck _.first(loansToDo,10), 'id'
+        url = "http://api.kivaws.org/v1/loans/#{ firstTenIds }.json"
+        $.get url, (resp)=>
+          #console.log resp.loans
+          loans = resp.loans
+          for loan in loans
+            @get(loan.id).set('borrowerInfo',loan.description.texts?.en ? '')
+          @getBorrowerInfo()
+
+
+
+
       
 
 class LoansList extends Backbone.View
   
-  className: 'container loansList'
-  tagName: 'div'
+  el: '.loans-list'
 
   initialize: ->
     @searchTerm = ''
@@ -149,18 +201,10 @@ class LoansList extends Backbone.View
 
     @collection.on 'remove', (m)=>
       m.view.remove()
-
-    @collection.on 'pledge:save', (m)=>
-      @collection.sort {silent: true}
-      @renderPledges()
-
       
 
   #template in coffeescript via coffeekup
   template: ->
-    table class:'table table-bordered', ->
-      tbody class:'pledges', ->
-        tr -> th colspan:4, -> h4 id:'pl', 'Pledge a loan to these partners by entering amounts to the right of their requests.'
 
     div class:'alert alert-info recentCount', ->
     
@@ -185,14 +229,7 @@ class LoansList extends Backbone.View
     @$el.html ck.render @template
 
     # create a view for each loan in the loan list
-    @addLoanView(loan) for loan in @collection.models
-    
-    @$('.pledges').waypoint (ev,direction)=>
-      @trigger 'pledge:scrollPast', direction
-
-    @$('.recentCount').waypoint (ev,direction)=>
-      if @$('.recentCount').is(':visible')
-        @trigger 'newLoans:scrollPast', direction
+    @addLoanView(loan) for loan in @collection.loansWithNoPledge()
 
     @addScrollTrigger()
     @
@@ -213,32 +250,17 @@ class LoansList extends Backbone.View
   addScrollTrigger: ->
 
     @$('.progress-container').html ck.render @scrollTriggerTemplate
-    ###
-    @$('.progress-container').click =>
-      @loadMore()
-    ###
     
     # lazy loading of results
+    @$('#more').waypoint('destroy')
+    $.waypoints('refresh')
+    
     wait 1000, =>
-      @$('#more').waypoint('destroy')
-      $.waypoints('refresh')
-      
       # lazy load older loans on scroll to bottom of page
       @$('#more').waypoint => 
         @loadMore()
       , { 'offset': '100%' }
 
-  
-
-  renderPledges: ->
-    @$('.pledges').html ''
-    @addLoanView(pledge) for pledge in @collection.pledgedLoans()
-    @
-
-  renderLoans: ->
-    @$('.loans').html ''
-    @addLoanView(loan) for loan in @collection.filteredCollection(@searchTerm)
-    @
 
   doSearch: (@searchTerm)->
     @renderLoans()
@@ -247,31 +269,26 @@ class LoansList extends Backbone.View
   addLoanView: (loan)->
     v = loan.view  ?= (new LoanView {model: loan}).remove()
     v.render()
-    
-    if loan.getPledge()
-      v.$el.appendTo @$('.pledges')
 
-    else if loan.matches(@searchTerm)
+    if loan.get('isRecent')
 
-      if loan.get('isRecent')
-        v.$el.prependTo @$('.loans')
-        v.$el.addClass('hl')
-        wait 1000, -> loan.view.$el.removeClass('hl')
-        loan.set 'isRecent', false
+      v.$el.prependTo @$('.loans')
+      v.$el.addClass('hl')
+      wait 1000, -> loan.view.$el.removeClass('hl')
+      loan.set 'isRecent', false
 
-      else
-        v.$el.appendTo @$('.loans')
+    else
+      v.$el.appendTo @$('.loans')
 
     v.delegateEvents()
 
-    # gather events from the loan views and trigger them from this view
-    loan.view.on 'all', (event,data)=>
-      @trigger event,data
-    
+
+
+class BorrowerInfoView extends Backbone.View
 
 class LoanView extends Backbone.View
   
-  className: 'loanView'
+  className: 'loan-view'
   tagName: 'tr'
 
   initialize: ->
@@ -282,17 +299,23 @@ class LoanView extends Backbone.View
     @model.on 'change', (m)=>
       @updateProgress()
 
+    @model.on 'change:borrowerInfo', (m)=>
+      console.log 'linking popup'
+      @$('.pop').fadeIn()
+
   template: ->
     td class:'main-info', ->
       div class:'info-cont', ->
         div class:'location', ->
-          img class:'flag', src: "#{@loan.flagImage()}"
+          #img class:'flag', src: "#{@loan.flagImage()}"
           div "#{@loan.get('location').country}"
         div class:'profile-icon', ->
           img src:"#{ @loan.profileImage() }"
         div class:'info', ->
-          div class:'name', "#{@loan.get 'name'}"
-          div class:'activity', "#{@loan.get 'activity'}"
+          span class:'name', "#{@loan.get 'name'}"
+          span class:'pop', ->
+            i class:'icon-info-sign'
+          div class:'activity', "#{@loan.get 'sector'}: #{@loan.get 'activity'}"
           div class:'use', "#{@loan.get 'use'}"
       div class:'time-posted', ->
         em "posted #{moment(@loan.get('postedMoment')).fromNow()}"
@@ -303,7 +326,7 @@ class LoanView extends Backbone.View
       div ->
         span class:'perc-funded', "#{@loan.percFunded()} %"
         span class:'funded', ->
-          div 'funded so far'
+          div "funded#{ if @loan.percFunded() is 100 then ' so far' else ''}"
           div class:'with-help-suffix', 'with your help!'
       div class:'progress progress-success', ->
         div class:'bar', style:"width: #{@loan.percFunded()}%;"
@@ -348,30 +371,50 @@ class LoanView extends Backbone.View
     @updateProgress()
     @
 
+
+class PledgesList extends Backbone.View
+  el: '.pledges-list'
+
+  template: ->
+    table class:'table table-bordered', ->
+      tbody class:'pledges', ->
+        #tr -> th colspan:4, -> h4 id:'pl', 'Pledge a loan to these partners by entering amounts to the right of their requests.'
+
+  render: ->
+    @$el.html ck.render @template
+    for pledge in @collection.pledgedLoans()
+      pledge.view.render().$el.appendTo @$('.pledges')
+    @
+
 # view for the top nav bar
 class TopBar extends Backbone.View
   el: '.navbar-fixed-top'
 
   initialize: ->
 
+    $('#my-pledges').waypoint (ev,direction)=>
+      if direction is 'up' then @navChoose('my-pledges')
+
+    $('#find-loans').waypoint (ev,direction)=>
+      @navChoose('find-loans')
+
+  navChoose: (item)->
+    $('#myNav li').removeClass 'active'
+    $("#myNav li.#{item}").addClass 'active'
+
+  refreshScroll: ->
+    $.waypoints('refresh')
+
   events:
-    'keyup .search': 'searchKeyPress'
-    'click .pledge-link': -> $('body').scrollTop -50
-    'click .new-loans': -> $('body').scrollTop ($('.recentCount').scrollTop() - 50)
+    'click li.my-pledges a': -> 
+      $('body').scrollTop -50
+      @navChoose('my-pledges')
+    'click li.find-loans a': -> 
+      @navChoose('find-loans')
+      $('body').scrollTop ($('#find-loans').offset().top - 85)
+      $('.search').focus()
     'click .submit-pledges': -> @trigger 'submit'
       
-
-  searchKeyPress: (e)->
-    search = => @trigger 'search', $(e.target).val()
-    
-    # clear the previous timeout for search
-    clearTimeout @searchTimeout
-    
-    # on return key, go ahead and search
-    if e.which is 13 then search()
-
-    # if another key, wait half a sec then search
-    else @searchTimeout = wait 500, => search()
 
   updatePledgeTotal: (newCount,newAmount)->
     if newCount is 0 then @$('.pledges-header').slideUp() else @$('.pledges-header').slideDown()
@@ -403,20 +446,117 @@ class TopBar extends Backbone.View
   loadTypeAhead: (keywords)->
     $('input.search').typeahead {source: keywords} 
 
+class SearchView extends Backbone.View
+  el: '.search-bar'
+  keywords: {}
+
+  initialize: ->
+
+  template: ->
+    a id:'yo'
+    div class:'navbar sub', ->
+      div class:'navbar-inner', ->
+        div class:'container', ->
+          form class:'navbar-form pull-left', ->
+            div class:'control-group', ->
+              div class:'input-prepend', ->
+                span class:'add-on', -> 
+                  i class:'icon-search'
+                input type:'text', placeholder:'search kiva loans', class:'span2 search search-query typeahead'
+            span class:'txt', 'that are'
+            div class:'btn-group status', ->
+              button class:'btn dropdown-toggle', 'data-toggle':'dropdown', ->
+                span class:'text', 'still raising funds '
+                span class:'caret'
+              ul class:'dropdown-menu', ->
+                li -> a 'data-value':'fundraising', 'still raising funds'
+                li -> a 'data-value':'funded', 'funded'
+                li -> a 'data-value':'almost funded', 'almost funded'
+            span class:'txt', 'from'
+            div class:'btn-group gender', ->
+              button class:'btn dropdown-toggle', 'data-toggle':'dropdown', ->
+                span class:'text', 'women and men '
+                span class:'caret'
+              ul class:'dropdown-menu', ->
+                li -> a 'data-value':'female', 'women only'
+                li -> a 'data-value':'male', 'men only'
+                li -> a 'data-value':'', 'women and men'
+            
+
+
+  events:
+    'change input.search':'search'
+    'click .gender a': 'setGender'
+    'click .status a': 'setStatus'
+      
+
+  setGender: (e)->
+    @options.gender = $(e.target).data('value')
+    @$('.gender .text').text $(e.target).text()+' '
+    @search()
+
+  setStatus: (e)->
+    @options.status = $(e.target).data('value')
+    @$('.status .text').text $(e.target).text()+' '
+    @search()
+
+
+  search: ->
+    @trigger 'search', @makeUrl()
+    
+
+  allKeywords: ->
+    _.flatten _.values @keywords
+
+  makeUrl: ->
+    url = "http://api.kivaws.org/v1/loans/search.json?q=#{ @$('.search').val() }"
+    url += if @options.gender then "&gender=#{ @options.gender }" else ''
+    url += if @options.status in ['funded','fundraising'] then "&status=#{ @options.status }" else ''
+    url += if @options.status is 'almost funded' then "&sortby=amount_remaining" else ''
+    console.log url
+    url
+
+  resetTypeAhead: ->
+    #console.log 'setting typeahead source: ',@allKeywords()
+    @$('input.search').typeahead {source: @allKeywords()}
+
+  render: ->
+    @$el.html ck.render @template
+    @$('#yo').waypoint (e,direction)->
+      #console.log 'wp'
+      if direction is 'down'
+        $('.search-bar .navbar').addClass('fixed')
+      else
+        $('.search-bar .navbar').removeClass('fixed')
+    , { offset: 65 }
+    @
+
+
+class Partner extends Backbone.Model
+
+class Partners extends Backbone.Collection
+  model: Partner
+  url: 'http://api.kivaws.org/v1/partners.json'
+  keywords: {}
+
+  parse: (resp)->
+    resp.partners
+
+  allCountries: ->
+    @keywords.countries ?= _.uniq _.pluck _.flatten(@pluck('countries')), 'name'
+
+  allRegions: ->
+    @keywords.regions ?= _.uniq _.pluck _.flatten(@pluck('countries')), 'region'
+
+  allNames: ->
+    @keywords.names ?= @pluck 'name'
+
+
 
 
 class Router extends Backbone.Router
-  initialize: ->
-    # collection for loans
-    @loans = new Loans()
-    
-    # views
-    @topBar = new TopBar()
-    @loansList = new LoansList({collection: @loans})   
-
-    # normally I'd boostrap them, 
-    # but here we're dealing with json via ajax only
-    @loans.fetch()
+  
+  eventController: ->
 
     # event handlers to tie together interaction between
     # the two views
@@ -424,29 +564,72 @@ class Router extends Backbone.Router
     @loans.on 'update:pledgeTotal', (newCount,newVal)=>
       @topBar.updatePledgeTotal(newCount,newVal)
 
-    @loans.on 'search:typeahead', (newKeywords)=>
-      @topBar.loadTypeAhead(newKeywords)
+    @loans.on 'pledge:save', (p)=>
+      console.log 'saved: ',p
+      @pledgeList ?= new PledgesList {collection: @loans}
+      @pledgeList.render()
 
-    @loansList.on 'pledge:scrollPast',(direction)=>
+    @loans.on 'search:addToTypeAhead', (keywords)=>
+      #@searchBar.keywords.tags = _.union (@searchBar.keywords.tags ?= []), keywords
+      #@searchBar.resetTypeAhead()
+
+
+    @pledgesList.on 'pledge:scrollPast',(direction)=>
       @topBar.togglePledgeLink(direction)
+    
     @loansList.on 'newLoans:scrollPast',(direction)=>
       @topBar.toggleNewLoansLink(direction)
 
-    @topBar.on 'search', (term)=>
-      @loansList.doSearch(term)
 
     @topBar.on 'submit', =>
       @loans.submit (resp)=>
         @topBar.showThanks =>
           @loans.clearPledges()
 
+    @searchBar.on 'search', (url)=>
+      @loans.url = url
+      @loans.page = 1
+      @loans.fetch {
+        success: => #console.log @loans
+      }
 
 
   routes:
     '':'home'
 
   home: ->
-    @loansList.render().open()
+    @topBar = new TopBar()
+    @searchBar = new SearchView()
+    @searchBar.render()
+    @loans = new Loans()
+    @partners = new Partners()
+    @loansList = new LoansList {collection: @loans}
+    @pledgesList = new PledgesList {collection: @loans}
+
+    @loans.restorePledges =>
+      @pledgesList.render()
+      @loans.fetch {
+        add: true
+        success: =>
+          @loans.getBorrowerInfo()
+          @loansList.render()
+          @topBar.refreshScroll()
+      }
+
+    @partners.fetch {
+      success: =>
+        _.extend @searchBar.keywords, {
+          countries: @partners.allCountries()
+          regions: @partners.allRegions()
+          partners: @partners.allNames()
+        }
+        @searchBar.resetTypeAhead()
+    }
+
+    @eventController()
+
+    
+    
 
 
 # for client side template rendering

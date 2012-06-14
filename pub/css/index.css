@@ -20,6 +20,13 @@
   font-weight: bold;
 }
 
+.info .pop{
+  display: none;
+  opacity: 0.5;
+  -moz-opacity: 0.5;
+  filter:alpha(opacity=5);
+}
+
 .flag {
   width: 50px;
   float: right;
@@ -112,6 +119,7 @@ thead {
 body {
   padding-top: 70px;
   background-color: #F7F7F2;
+  min-height: 1000px;
 }
 
 .messageArea {
@@ -134,6 +142,10 @@ body {
   float: left;
 }
 
+.brand.kiva {
+  float: left;
+}
+
 .brand img {
   max-height: 40px;
 }
@@ -149,15 +161,63 @@ body {
   padding: 4px;
 }
 
-input.search {
-  background-color: white;
-  margin-top: 15px;
-}
 
 .recentCount {
   display: none;
 }
 
+.navbar .control-group, .navbar .btn-group {
+  float: left;
+}
+
+.navbar span.txt {
+  float: left;
+  font-size: 16px;
+  padding: 8px;
+  color: #333;
+}
+
+.search-bar-cont {
+  height: 70px;
+}
+
+.search-bar-cont .navbar-inner {
+  background-color: #d2e6d0;
+  border: none;
+}
+
+.navbar.fixed {
+  position: fixed;
+  z-index: 5000;
+  top: 60px;
+}
+
+#myNav ul {
+  padding-top: 13px;
+  padding-left: 20px;
+}
+
+#myNav li a{
+  background-color: white;
+  text-shadow: none;
+  font-size: 18px;
+  color: #74b446;
+  opacity: 0.8;
+  -moz-opacity: 0.8;
+  filter:alpha(opacity=8);
+  cursor: pointer;
+}
+
+#myNav li.active a{
+  background-color: white;
+  font-weight: bold;
+  cursor: pointer;
+  text-decoration: underline;
+  opacity: 1;
+  -moz-opacity: 1;
+  filter:alpha(opacity=1);
+}
+
 .typeahead {
-  z-index: 9000;
+  z-index: 7000;
 }
