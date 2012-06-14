@@ -57,6 +57,10 @@
       return parseInt(this.get('pledge'), 10);
     };
 
+    Loan.prototype.getSectorActivity = function() {
+      return "" + (this.get('sector') !== this.get('activity') ? this.get('sector') + ': ' : '') + (this.get('activity'));
+    };
+
     Loan.prototype.validate = function(attrs) {
       var ok;
       ok = /(''|^[0-9]+$)/.test(attrs.pledge);
@@ -105,26 +109,31 @@
     };
 
     Loans.prototype.restorePledges = function(cb) {
-      var oldUrl, prevPledges, _ref,
+      var oldUrl, prevPledges,
         _this = this;
-      prevPledges = JSON.parse((_ref = typeof localStorage !== "undefined" && localStorage !== null ? localStorage.getItem('kivaPledges') : void 0) != null ? _ref : []);
-      if (prevPledges.length) {
-        oldUrl = this.url;
-        this.url = "http://api.kivaws.org/v1/loans/" + (_.keys(prevPledges).join(',')) + ".json";
-        console.log(this.url);
-        return this.fetch({
-          add: true,
-          success: function() {
-            var loan, _i, _len, _ref1;
-            _ref1 = _this.models;
-            for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
-              loan = _ref1[_i];
-              loan.set('pledge', prevPledges[loan.id]);
+      if (window.localStorage.kivaPledges) {
+        prevPledges = JSON.parse(typeof localStorage !== "undefined" && localStorage !== null ? localStorage.getItem('kivaPledges') : void 0);
+        console.log('restoring prev pledges', prevPledges);
+        if (_.keys(prevPledges).length) {
+          oldUrl = this.url;
+          this.url = "http://api.kivaws.org/v1/loans/" + (_.keys(prevPledges).join(',')) + ".json";
+          console.log(this.url);
+          return this.fetch({
+            add: true,
+            success: function() {
+              var loan, _i, _len, _ref;
+              _ref = _this.models;
+              for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+                loan = _ref[_i];
+                loan.set('pledge', prevPledges[loan.id]);
+              }
+              _this.url = oldUrl;
+              return cb();
             }
-            _this.url = oldUrl;
-            return cb();
-          }
-        });
+          });
+        } else {
+          return cb();
+        }
       } else {
         return cb();
       }
@@ -204,14 +213,16 @@
     };
 
     Loans.prototype.parse = function(resp) {
-      var keywords, l, loans, _i, _len,
+      var keywords, l, loans, _i, _len, _ref, _ref1,
         _this = this;
       console.log(this.url, resp);
       this.page++;
       console.log('loading more...');
+      this.resultsCount = (_ref = (_ref1 = resp.paging) != null ? _ref1.total : void 0) != null ? _ref : 0;
+      this.trigger('update:resultsCount', this.resultsCount);
       loans = _.reject(resp.loans, function(l) {
-        var _ref;
-        return _ref = l.id, __indexOf.call(_.pluck(_this.models, 'id'), _ref) >= 0;
+        var _ref2;
+        return _ref2 = l.id, __indexOf.call(_.pluck(_this.models, 'id'), _ref2) >= 0;
       });
       keywords = [];
       for (_i = 0, _len = loans.length; _i < _len; _i++) {
@@ -237,7 +248,7 @@
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
           p = _ref[_i];
           _results.push({
-            loanId: p.get('id'),
+            id: p.get('id'),
             amount: p.get('pledge')
           });
         }
@@ -247,6 +258,30 @@
         pledges: myPledges
       }, function(resp) {
         return cb(resp);
+      });
+    };
+
+    Loans.prototype.submitToBasket = function() {
+      var formEl, myPledges, p;
+      myPledges = JSON.stringify((function() {
+        var _i, _len, _ref, _results;
+        _ref = this.pledgedLoans();
+        _results = [];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          p = _ref[_i];
+          _results.push({
+            id: p.get('id'),
+            amount: p.get('pledge')
+          });
+        }
+        return _results;
+      }).call(this));
+      console.log(myPledges);
+      formEl = $('#submitToBasket');
+      $(formEl).find('input[name="loans"]').val(myPledges);
+      this.clearPledges();
+      return wait(250, function() {
+        return formEl[0].submit();
       });
     };
 
@@ -342,7 +377,7 @@
         _this.$('.recentCount').fadeOut();
         return _this.addNewLoans();
       });
-      return $('.new-loans').show();
+      return this.collection.trigger('update:recentCount', newCount);
     };
 
     LoansList.prototype.addNewLoans = function() {
@@ -369,10 +404,14 @@
     };
 
     LoansList.prototype.loadMore = function() {
+      var _this = this;
       this.collection.fetch({
         add: true,
         data: {
           page: this.collection.page
+        },
+        success: function() {
+          return _this.collection.getBorrowerInfo();
         }
       });
       return this.addScrollTrigger();
@@ -446,6 +485,38 @@
       return BorrowerInfoView.__super__.constructor.apply(this, arguments);
     }
 
+    BorrowerInfoView.prototype.className = 'borrowerInfo';
+
+    BorrowerInfoView.prototype.tagName = 'div';
+
+    BorrowerInfoView.prototype.template = function() {
+      return div({
+        "class": 'modal hide',
+        'data-toggle': 'modal'
+      }, function() {
+        div({
+          "class": 'modal-header'
+        }, function() {
+          return h3("" + (this.loan.get('name')) + " ");
+        });
+        div({
+          "class": 'modal-body'
+        }, "" + (this.loan.get('borrowerInfo')));
+        return div({
+          "class": 'modal-footer'
+        });
+      });
+    };
+
+    BorrowerInfoView.prototype.render = function() {
+      this.$el.html(ck.render(this.template, {
+        loan: this.model
+      }));
+      this.$el.appendTo('.main');
+      this.$('.modal').modal('show');
+      return this;
+    };
+
     return BorrowerInfoView;
 
   })(Backbone.View);
@@ -473,7 +544,12 @@
       });
       return this.model.on('change:borrowerInfo', function(m) {
         console.log('linking popup');
-        return _this.$('.pop').fadeIn();
+        _this.$('.pop').fadeIn();
+        _this.$('.more-info').text(_this.model.get('borrowerInfo'));
+        _this.$('.more-info-cont').fadeIn();
+        return _this.$('.profile-icon').addClass('active').click(function() {
+          return _this.borrowerInfoView.render();
+        });
       });
     };
 
@@ -487,6 +563,10 @@
           div({
             "class": 'location'
           }, function() {
+            img({
+              "class": 'flag',
+              src: "" + (this.loan.flagImage())
+            });
             return div("" + (this.loan.get('location').country));
           });
           div({
@@ -500,21 +580,29 @@
             "class": 'info'
           }, function() {
             span({
-              "class": 'name'
-            }, "" + (this.loan.get('name')));
-            span({
               "class": 'pop'
             }, function() {
               return i({
-                "class": 'icon-info-sign'
+                "class": 'icon-info-sign icon-white'
               });
             });
+            span({
+              "class": 'name'
+            }, "" + (this.loan.get('name')));
             div({
               "class": 'activity'
-            }, "" + (this.loan.get('sector')) + ": " + (this.loan.get('activity')));
+            }, "" + (this.loan.getSectorActivity()));
             return div({
-              "class": 'use'
-            }, "" + (this.loan.get('use')));
+              "class": 'more-info-cont'
+            }, function() {
+              var _ref;
+              div({
+                "class": 'more-info'
+              }, "" + ((_ref = this.loan.get('borrowerInfo')) != null ? _ref : ''));
+              return div({
+                "class": 'label label-small read-more'
+              }, 'read more &darr;');
+            });
           });
         });
         return div({
@@ -523,9 +611,14 @@
           return em("posted " + (moment(this.loan.get('postedMoment')).fromNow()));
         });
       });
-      td({
-        "class": 'needed'
-      }, "$ " + (this.loan.get('loan_amount')));
+      td(function() {
+        div({
+          "class": 'needed'
+        }, "$ " + (this.loan.get('loan_amount')));
+        return div({
+          "class": 'use'
+        }, "" + (this.loan.get('use')));
+      });
       td({
         "class": 'status'
       }, function() {
@@ -621,6 +714,12 @@
         loan: this.model
       }));
       this.updateProgress();
+      if (this.model.get('borrowerInfo')) {
+        this.$('.more-info-cont').show();
+      }
+      this.borrowerInfoView = new BorrowerInfoView({
+        model: this.model
+      });
       return this;
     };
 
@@ -719,15 +818,12 @@
       return this;
     };
 
-    TopBar.prototype.togglePledgeLink = function(direction) {
-      if (direction === 'up') {
-        return this.$('.pledge-link').hide();
-      } else {
-        return this.$('.pledge-link').show();
-      }
+    TopBar.prototype.updateRecentCount = function(newCount) {
+      return this.$('.find-loans .badge').fadeIn().text(newCount);
     };
 
     TopBar.prototype.toggleNewLoansLink = function(direction) {
+      console.log('wp ', direction);
       if (direction === 'up') {
         return this.$('.new-loans').hide();
       } else {
@@ -766,7 +862,12 @@
     };
 
     TopBar.prototype.showThanks = function(cb) {
-      return $('#thanks').modal('show').on('shown', cb);
+      var _this = this;
+      $('#thanks').modal('show').on('shown', cb);
+      return $('#thanks .submitToBasket').click(function() {
+        console.log('baskbutton clicked');
+        return _this.trigger('toBasket');
+      });
     };
 
     TopBar.prototype.loadTypeAhead = function(keywords) {
@@ -806,11 +907,11 @@
           return div({
             "class": 'container'
           }, function() {
-            return form({
+            form({
               "class": 'navbar-form pull-left'
             }, function() {
               div({
-                "class": 'control-group'
+                "class": 'control-group search-container'
               }, function() {
                 return div({
                   "class": 'input-prepend'
@@ -818,13 +919,17 @@
                   span({
                     "class": 'add-on'
                   }, function() {
-                    return i({
+                    i({
                       "class": 'icon-search'
+                    });
+                    return img({
+                      "class": 'wait',
+                      src: 'img/wait.gif'
                     });
                   });
                   return input({
                     type: 'text',
-                    placeholder: 'search kiva loans',
+                    placeholder: 'find kiva loans',
                     "class": 'span2 search search-query typeahead'
                   });
                 });
@@ -904,6 +1009,9 @@
                 });
               });
             });
+            return span({
+              "class": 'results-count pull-right'
+            }, '');
           });
         });
       });
@@ -928,7 +1036,17 @@
     };
 
     SearchView.prototype.search = function() {
-      return this.trigger('search', this.makeUrl());
+      var _this = this;
+      this.$('.icon-search').hide();
+      this.$('img.wait').show();
+      return this.trigger('search', this.makeUrl(), function() {
+        _this.$('.icon-search').show();
+        return _this.$('img.wait').hide();
+      });
+    };
+
+    SearchView.prototype.updateResultsCount = function(newCount) {
+      return this.$('.results-count').text("" + newCount + " loans found");
     };
 
     SearchView.prototype.allKeywords = function() {
@@ -1026,6 +1144,19 @@
       return Router.__super__.constructor.apply(this, arguments);
     }
 
+    Router.prototype.initialize = function() {
+      this.topBar = new TopBar();
+      this.searchBar = new SearchView();
+      this.loans = new Loans();
+      this.partners = new Partners();
+      this.loansList = new LoansList({
+        collection: this.loans
+      });
+      return this.pledgesList = new PledgesList({
+        collection: this.loans
+      });
+    };
+
     Router.prototype.eventController = function() {
       var _this = this;
       this.loans.on('update:pledgeTotal', function(newCount, newVal) {
@@ -1041,7 +1172,12 @@
         }
         return _this.pledgeList.render();
       });
-      this.loans.on('search:addToTypeAhead', function(keywords) {});
+      this.loans.on('update:resultsCount', function(newCount) {
+        return _this.searchBar.updateResultsCount(newCount);
+      });
+      this.loans.on('update:recentCount', function(newCount) {
+        return _this.topBar.updateRecentCount(newCount);
+      });
       this.pledgesList.on('pledge:scrollPast', function(direction) {
         return _this.topBar.togglePledgeLink(direction);
       });
@@ -1050,38 +1186,28 @@
       });
       this.topBar.on('submit', function() {
         return _this.loans.submit(function(resp) {
-          return _this.topBar.showThanks(function() {
-            return _this.loans.clearPledges();
-          });
+          return _this.topBar.showThanks();
         });
       });
-      return this.searchBar.on('search', function(url) {
+      this.topBar.on('toBasket', function() {
+        console.log('basketEvent');
+        return _this.loans.submitToBasket();
+      });
+      return this.searchBar.on('search', function(url, done) {
         _this.loans.url = url;
         _this.loans.page = 1;
         return _this.loans.fetch({
-          success: function() {}
+          success: function() {
+            done();
+            return _this.loans.getBorrowerInfo();
+          }
         });
       });
     };
 
-    Router.prototype.routes = {
-      '': 'home'
-    };
-
-    Router.prototype.home = function() {
+    Router.prototype.restorePledges = function() {
       var _this = this;
-      this.topBar = new TopBar();
-      this.searchBar = new SearchView();
-      this.searchBar.render();
-      this.loans = new Loans();
-      this.partners = new Partners();
-      this.loansList = new LoansList({
-        collection: this.loans
-      });
-      this.pledgesList = new PledgesList({
-        collection: this.loans
-      });
-      this.loans.restorePledges(function() {
+      return this.loans.restorePledges(function() {
         _this.pledgesList.render();
         return _this.loans.fetch({
           add: true,
@@ -1092,7 +1218,11 @@
           }
         });
       });
-      this.partners.fetch({
+    };
+
+    Router.prototype.populateTypeahead = function() {
+      var _this = this;
+      return this.partners.fetch({
         success: function() {
           _.extend(_this.searchBar.keywords, {
             countries: _this.partners.allCountries(),
@@ -1102,6 +1232,16 @@
           return _this.searchBar.resetTypeAhead();
         }
       });
+    };
+
+    Router.prototype.routes = {
+      '': 'home'
+    };
+
+    Router.prototype.home = function() {
+      this.restorePledges();
+      this.searchBar.render();
+      this.populateTypeahead();
       return this.eventController();
     };
 

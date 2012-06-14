@@ -2,8 +2,9 @@
 .info, .profile-icon {
   float: left;
   padding: 3px;
-  max-width: 150px
+  max-width: 200px
 }
+
 
 .info-cont {
   clear: both;
@@ -15,16 +16,29 @@
   background-color: white;
 }
 
+.profile-icon.active {
+  cursor: pointer;
+}
+
+.profile-icon.active .icon{
+  cursor: pointer;
+}
+
+.profile-icon.active:hover {
+  border: 1px solid yellow;
+}
+
 .name {
   font-size: 20px;
   font-weight: bold;
 }
 
 .info .pop{
+  position: relative;
+  top: 0px;
+  left: -25px;
+  margin-right: -10px;
   display: none;
-  opacity: 0.5;
-  -moz-opacity: 0.5;
-  filter:alpha(opacity=5);
 }
 
 .flag {
@@ -33,9 +47,44 @@
 }
 
 .needed, .perc-funded {
-  color: green;
+  color: #74b446;
   font-size: 24px;
   margin-bottom: 4px;
+}
+
+.more-info-cont {
+  display: none;
+  width: 100%;
+  opacity: 0.5;
+  -moz-opacity: 0.5;
+  filter:alpha(opacity=5);
+  cursor: pointer;
+}
+
+.more-info-cont:hover {
+  opacity: 1;
+  -moz-opacity: 1;
+  filter:alpha(opacity=1);
+}
+
+.more-info {
+  font-size: 12px;
+  font-style: italic;
+  height: 55px;
+  overflow: hidden;
+  color: #333;
+}
+
+.read-more {
+  background-color: #eee;
+  color: #333;
+  font-weight: normal;
+  text-align: center;
+  font-size: 10;
+}
+
+.use {
+  width: 100px;
 }
 
 .with-help {
@@ -142,6 +191,16 @@ body {
   float: left;
 }
 
+.navbar .btn i {
+  float: left;
+  margin: 6px;
+}
+
+.modal .btn i {
+  float: left;
+  margin: 6px;
+}
+
 .brand.kiva {
   float: left;
 }
@@ -164,6 +223,7 @@ body {
 
 .recentCount {
   display: none;
+  cursor: pointer;
 }
 
 .navbar .control-group, .navbar .btn-group {
@@ -186,16 +246,30 @@ body {
   border: none;
 }
 
+.search-bar-cont img.wait {
+  display: none;
+}
+
+.search-bar-cont .results-count {
+  float: right;
+  font-size: 18px;
+  font-style: italic;
+  margin-top: 10px;
+  margin-left: 50px;
+}
+
 .navbar.fixed {
   position: fixed;
-  z-index: 5000;
+  z-index: 3000;
   top: 60px;
 }
 
 #myNav ul {
   padding-top: 13px;
   padding-left: 20px;
+
 }
+
 
 #myNav li a{
   background-color: white;
@@ -206,18 +280,45 @@ body {
   -moz-opacity: 0.8;
   filter:alpha(opacity=8);
   cursor: pointer;
+  float: left;
+  clear: none;
 }
+
+
 
 #myNav li.active a{
   background-color: white;
   font-weight: bold;
   cursor: pointer;
-  text-decoration: underline;
   opacity: 1;
   -moz-opacity: 1;
   filter:alpha(opacity=1);
+  text-shadow: #ccc 0 0 8px;
+}
+
+#myNav li span.badge {
+  float: left;
+  clear: none;
+  display: none;
+}
+
+.badge-success: {
+  background-color: #74b446;
+  float: left;
+  clear: none;
 }
 
 .typeahead {
   z-index: 7000;
+}
+
+#submitToBasket {
+  display: none;
+}
+
+.modal {
+  z-index: 9000;
+}
+.modal-backdrop {
+  z-index: 8000;
 }
