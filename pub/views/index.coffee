@@ -43,7 +43,6 @@ html lang:'en', ->
       
 
     script src:'/js/utils.js', type:'text/javascript'
-    script type:"text/javascript", src:"http://maps.googleapis.com/maps/api/js?key=AIzaSyDcYD-ok5lkpCvOc9P70Bas4BfDqTSI5kA&sensor=false"
     script src:'/js/bootstrap.min.js', type:'text/javascript'
     script src:'/js/waypoints.min.js', type:'text/javascript'
     script src:'/js/ck.js', type: 'text/javascript'
