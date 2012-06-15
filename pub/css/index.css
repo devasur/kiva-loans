@@ -14,6 +14,8 @@
   border-radius: 4px;
   border: 1px solid #eee;
   background-color: white;
+  margin: 2px;
+  box-shadow: 1px 1px 1px #999;
 }
 
 .profile-icon.active {
@@ -102,7 +104,10 @@
 }
 
 .pledges td.main-info {
-  border-left: 4px solid #74b446;
+  border-left: 4px solid #f68a15;
+}
+.pledges td.pledge-area {
+  border-right: 4px solid #f68a15;
 }
 
 .funded, .use{
@@ -123,6 +128,10 @@
 .location div {
   float: right;
   clear: both;
+}
+
+.location i {
+  cursor: pointer;
 }
 
 .time-posted {
@@ -158,12 +167,7 @@ table {
   background-color: white;
 }
 
-thead {
-  background-color: #74b446;
-  color: white;
-  font-size: 20px;
-  display: none;
-}
+
 
 body {
   padding-top: 70px;
@@ -176,9 +180,15 @@ body {
   margin-top: 10px;
 }
 
-.hl {
-  background-color: rgba(0,100,0,0.2);
+
+tr.hl td.main-info {
+  border-left: 4px solid #f68a15;
 }
+
+tr.hl td.pledge-area {
+  border-right: 4px solid #f68a15;
+}
+
 
 
 .navbar-inner {
@@ -198,7 +208,8 @@ body {
 
 .modal .btn i {
   float: left;
-  margin: 6px;
+  clear: none;
+  cursor: pointer;
 }
 
 .brand.kiva {
@@ -221,7 +232,7 @@ body {
 }
 
 
-.recentCount {
+.newCount {
   display: none;
   cursor: pointer;
 }
@@ -284,6 +295,10 @@ body {
   clear: none;
 }
 
+#myNav li.my-pledges a {
+  color: #f68a15;
+}
+
 
 
 #myNav li.active a{
@@ -293,13 +308,14 @@ body {
   opacity: 1;
   -moz-opacity: 1;
   filter:alpha(opacity=1);
-  text-shadow: #ccc 0 0 8px;
+  text-shadow: #ccc 1px 1px 2px;
 }
 
 #myNav li span.badge {
   float: left;
   clear: none;
   display: none;
+  margin-top: 12px;
 }
 
 .badge-success: {
@@ -321,4 +337,21 @@ body {
 }
 .modal-backdrop {
   z-index: 8000;
+}
+
+.table tr.loan-view:hover td {
+  background-color: rgba(249,162,38,0.025);
+}
+
+.location-map .modal-body {
+  height: 400px;
+}
+
+.borrower-info img {
+  float: right;
+  clear: none;
+  margin: 6px;
+  border: 1px solid #eee;
+  padding: 3px;
+  box-shadow: 1px 1px 2px #333;
 }

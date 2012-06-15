@@ -45,37 +45,5 @@ app.post '/reqBin/:id', (req,res)->
   
   postBin.end postData
 
-# check to see if we have the flag
-# if not, try to get the image from the geognos api
-# and download it locally
-
-app.get '/flag/:countryCode', (req,res)->
-  # where the image should be if already downloaded
-  localPath = "#{__dirname}/../pub/img/flags/#{req.params.countryCode}.png"
-  servePath = "/img/flags/#{req.params.countryCode}.png"
-  
-  # if we have it local, just send it
-  if path.exists localPath
-    res.redirect servePath
-  
-  # else, get it from the geognos api, then send it
-  else
-    options =
-      host: "www.geognos.com"
-      path: "/api/en/countries/flag/#{req.params.countryCode}.png"
-      port: 80
-
-    http.get options, (resp)->
-      fileStream = fs.createWriteStream(localPath)
-      resp.on 'data', (data)->
-        fileStream.write data
-      resp.on 'end', ->
-        fileStream.end()
-        fileStream.destroySoon()
-        fs.chmod localPath, '775', ->
-          res.redirect servePath 
-    
-    
-
 
 app.listen 5555

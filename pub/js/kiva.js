@@ -53,35 +53,6 @@
     return postBin.end(postData);
   });
 
-  app.get('/flag/:countryCode', function(req, res) {
-    var localPath, options, servePath;
-    localPath = "" + __dirname + "/../pub/img/flags/" + req.params.countryCode + ".png";
-    servePath = "/img/flags/" + req.params.countryCode + ".png";
-    if (path.exists(localPath)) {
-      return res.redirect(servePath);
-    } else {
-      options = {
-        host: "www.geognos.com",
-        path: "/api/en/countries/flag/" + req.params.countryCode + ".png",
-        port: 80
-      };
-      return http.get(options, function(resp) {
-        var fileStream;
-        fileStream = fs.createWriteStream(localPath);
-        resp.on('data', function(data) {
-          return fileStream.write(data);
-        });
-        return resp.on('end', function() {
-          fileStream.end();
-          fileStream.destroySoon();
-          return fs.chmod(localPath, '775', function() {
-            return res.redirect(servePath);
-          });
-        });
-      });
-    }
-  });
-
   app.listen(5555);
 
 }).call(this);
