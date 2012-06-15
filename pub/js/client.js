@@ -240,6 +240,10 @@
       }
     };
 
+    Loans.prototype.clearNonPledges = function() {
+      return this.remove(this.loansWithNoPledge());
+    };
+
     Loans.prototype.parse = function(resp) {
       var keywords, l, loans, _i, _len, _ref, _ref1,
         _this = this;
@@ -280,7 +284,7 @@
         }
         return _results;
       }).call(this);
-      return $.post('/reqBin/11xkiun1', {
+      return $.post('/reqBin/1gvkakw1', {
         loans: myPledges
       }, function(resp) {
         return cb(resp);
@@ -1314,9 +1318,9 @@
         h3('Here is the receipt on requestb.in:');
         a({
           "class": 'btn btn-info',
-          href: 'http://requestb.in/11xkiun1?inspect',
+          href: 'http://requestb.in/1gvkakw1?inspect',
           target: '_blank'
-        }, 'http://requestb.in/11xkiun1?inspect');
+        }, 'http://requestb.in/1gvkakw1?inspect');
         h3('Or... take it to a real, live Kiva Basket:');
         return a({
           "class": 'btn btn-warning submitToBasket'
@@ -1409,7 +1413,9 @@
       return this.searchBar.on('search', function(url, done) {
         _this.loans.url = url;
         _this.loans.page = 1;
+        _this.loans.clearNonPledges();
         return _this.loans.fetch({
+          add: true,
           success: function() {
             done();
             return _this.loans.getBorrowerInfo();

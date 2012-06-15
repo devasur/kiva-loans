@@ -157,6 +157,9 @@ class Loans extends Backbone.Collection
         m.matches(@term)
     else loansToSearch
 
+  clearNonPledges: ->
+    @remove @loansWithNoPledge()
+
   # pull out the loan array in the JSON as it arrives
   parse: (resp)->
     @page++
@@ -186,7 +189,7 @@ class Loans extends Backbone.Collection
   
   submit: (cb)->
     myPledges = ({id: p.get('id'), amount: p.get('pledge')} for p in @pledgedLoans())
-    $.post '/reqBin/11xkiun1', {loans: myPledges}, (resp)->
+    $.post '/reqBin/1gvkakw1', {loans: myPledges}, (resp)->
       cb(resp)
 
   submitToBasket: ->
@@ -711,7 +714,7 @@ class ThanksView extends Backbone.View
       div class:'modal-header', -> h3 'Thank you for helping!'
       div class:'modal-body', ->
         h3 'Here is the receipt on requestb.in:'
-        a class:'btn btn-info',href:'http://requestb.in/11xkiun1?inspect',target:'_blank', 'http://requestb.in/11xkiun1?inspect'
+        a class:'btn btn-info',href:'http://requestb.in/1gvkakw1?inspect',target:'_blank', 'http://requestb.in/1gvkakw1?inspect'
         h3 'Or... take it to a real, live Kiva Basket:'
         a class:'btn btn-warning submitToBasket', ->
           i class:'icon-shopping-cart icon-white'
@@ -776,7 +779,9 @@ class Router extends Backbone.Router
     @searchBar.on 'search', (url, done)=>
       @loans.url = url
       @loans.page = 1
+      @loans.clearNonPledges()
       @loans.fetch {
+        add: true
         success: =>
           done()
           @loans.getBorrowerInfo()
