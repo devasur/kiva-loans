@@ -476,6 +476,7 @@ class LoansList extends Backbone.View
   addNewLoans: ->
     for loan in @collection.recentLoans()
       @addLoanView(loan)
+      @collection.getBorrowerInfo()
       @trigger 'cleared:recentLoans'
 
 

@@ -850,6 +850,7 @@
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         loan = _ref[_i];
         this.addLoanView(loan);
+        this.collection.getBorrowerInfo();
         _results.push(this.trigger('cleared:recentLoans'));
       }
       return _results;
