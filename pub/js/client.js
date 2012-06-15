@@ -1418,7 +1418,8 @@
           add: true,
           success: function() {
             done();
-            return _this.loans.getBorrowerInfo();
+            _this.loans.getBorrowerInfo();
+            return _this.loansList.addScrollTrigger();
           }
         });
       });
@@ -1446,7 +1447,8 @@
           _.extend(_this.searchBar.keywords, {
             countries: _this.partners.allCountries(),
             regions: _this.partners.allRegions(),
-            partners: _this.partners.allNames()
+            partners: _this.partners.allNames(),
+            sectors: ['Agriculture', 'Arts', 'Clothing', 'Construction', 'Education', 'Entertainment', 'Food', 'Health', 'Housing', 'Manufacturing', 'Personal Use', 'Retail', 'Services', 'Transportation', 'Wholesale']
           });
           return _this.searchBar.resetTypeAhead();
         }

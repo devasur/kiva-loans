@@ -785,6 +785,7 @@ class Router extends Backbone.Router
         success: =>
           done()
           @loans.getBorrowerInfo()
+          @loansList.addScrollTrigger()
       }
 
   # restore and show any pledges saved in 
@@ -809,6 +810,7 @@ class Router extends Backbone.Router
           countries: @partners.allCountries()
           regions: @partners.allRegions()
           partners: @partners.allNames()
+          sectors: ['Agriculture', 'Arts', 'Clothing', 'Construction', 'Education', 'Entertainment', 'Food', 'Health', 'Housing', 'Manufacturing', 'Personal Use', 'Retail', 'Services', 'Transportation', 'Wholesale']
         }
         @searchBar.resetTypeAhead()
     }
