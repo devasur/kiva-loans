@@ -165,6 +165,7 @@ class Loans extends Backbone.Collection
     @page++
     # remove any loans that have already been loaded
     @resultsCount = resp.paging?.total ? 0
+    @resultsPages = resp.paging?.pages ? 1
     @trigger 'update:resultsCount', @resultsCount
     loans = _.reject resp.loans, (l)=> l.id in _.pluck(@models,'id')
 
@@ -491,13 +492,16 @@ class LoansList extends Backbone.View
 
   # fetches the next page of results (for older loans)
   loadMore: ->
-    @collection.fetch {
-      add: true
-      data: {page: @collection.page}
-      success: =>
-        @collection.getBorrowerInfo()
-    }
-    @addScrollTrigger()
+    if @collection.page < @collection.resultsPages
+      @collection.fetch {
+        add: true
+        data: {page: @collection.page}
+        success: =>
+          @collection.getBorrowerInfo()
+      }
+      @addScrollTrigger()
+    else
+      @removeScrollTrigger()
 
 
   scrollTriggerTemplate: ->
@@ -520,6 +524,10 @@ class LoansList extends Backbone.View
       @$('#more').waypoint => 
         @loadMore()
       , { 'offset': '100%' }
+
+  removeScrollTrigger: ->
+    @$('.progress-container td').html 'No more results'
+    @$('#more').waypoint('destroy')
 
 
   # adds a new Loan View and renders it inside this view

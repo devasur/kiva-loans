@@ -245,14 +245,15 @@
     };
 
     Loans.prototype.parse = function(resp) {
-      var keywords, l, loans, _i, _len, _ref, _ref1,
+      var keywords, l, loans, _i, _len, _ref, _ref1, _ref2, _ref3,
         _this = this;
       this.page++;
       this.resultsCount = (_ref = (_ref1 = resp.paging) != null ? _ref1.total : void 0) != null ? _ref : 0;
+      this.resultsPages = (_ref2 = (_ref3 = resp.paging) != null ? _ref3.pages : void 0) != null ? _ref2 : 1;
       this.trigger('update:resultsCount', this.resultsCount);
       loans = _.reject(resp.loans, function(l) {
-        var _ref2;
-        return _ref2 = l.id, __indexOf.call(_.pluck(_this.models, 'id'), _ref2) >= 0;
+        var _ref4;
+        return _ref4 = l.id, __indexOf.call(_.pluck(_this.models, 'id'), _ref4) >= 0;
       });
       keywords = [];
       for (_i = 0, _len = loans.length; _i < _len; _i++) {
@@ -868,16 +869,20 @@
 
     LoansList.prototype.loadMore = function() {
       var _this = this;
-      this.collection.fetch({
-        add: true,
-        data: {
-          page: this.collection.page
-        },
-        success: function() {
-          return _this.collection.getBorrowerInfo();
-        }
-      });
-      return this.addScrollTrigger();
+      if (this.collection.page < this.collection.resultsPages) {
+        this.collection.fetch({
+          add: true,
+          data: {
+            page: this.collection.page
+          },
+          success: function() {
+            return _this.collection.getBorrowerInfo();
+          }
+        });
+        return this.addScrollTrigger();
+      } else {
+        return this.removeScrollTrigger();
+      }
     };
 
     LoansList.prototype.scrollTriggerTemplate = function() {
@@ -910,6 +915,11 @@
           'offset': '100%'
         });
       });
+    };
+
+    LoansList.prototype.removeScrollTrigger = function() {
+      this.$('.progress-container td').html('No more results');
+      return this.$('#more').waypoint('destroy');
     };
 
     LoansList.prototype.addLoanView = function(loan) {
