@@ -19,3 +19,8 @@ Features
 - posts to a real kiva basket 
 - extended borrower and partner info
 
+documented code:
+- [client](http://pzzd.us:5555/docs/client.html)
+- [server](http://pzzd.us:5555/docs/kiva.html)
+- [template](http://pzzd.us:5555/docs/index.html)
+
