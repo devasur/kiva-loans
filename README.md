@@ -1,7 +1,7 @@
 kiva-loans
 ==========
 
-kiva loan organizer
+*kiva loan organizer*
 [live demo](http://pzzd.us:5555)
 
 to install:
